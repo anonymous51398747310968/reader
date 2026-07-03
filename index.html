@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="書見">
+<title>書見 — 小説リーダー</title>
+<style>
+:root{
+  --ink:#2b2b2b; --paper:#ffffff; --paper2:#f4f4f4; --line:#e2e2e2;
+  --accent:#2f4f6f; --accent-ink:#ffffff; --muted:#8a8a8a;
+  --radius:14px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{
+  font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  background:var(--paper);color:var(--ink);
+  -webkit-text-size-adjust:100%;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.hidden{display:none!important}
+
+/* ===== 本棚 ===== */
+#shelf{min-height:100%;background:var(--paper2);padding-bottom:calc(90px + var(--sab))}
+.shelf-head{
+  padding:calc(18px + var(--sat)) 20px 14px;
+  background:var(--paper);border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:5;
+}
+.shelf-head h1{font-size:22px;font-weight:700;letter-spacing:.12em;
+  font-family:"Hiragino Mincho ProN","Noto Serif JP",serif}
+.shelf-head p{font-size:12px;color:var(--muted);margin-top:3px}
+#bookList{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.book{
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px;display:flex;align-items:center;gap:14px;text-align:left;width:100%;
+}
+.book:active{transform:scale(.985)}
+.spine{
+  width:8px;align-self:stretch;border-radius:4px;background:var(--accent);flex:none;
+  min-height:52px;
+}
+.book-info{flex:1;min-width:0}
+.book-title{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:"Hiragino Mincho ProN","Noto Serif JP",serif}
+.book-meta{font-size:12px;color:var(--muted);margin-top:5px;display:flex;gap:10px;align-items:center}
+.prog-track{flex:1;height:3px;background:var(--line);border-radius:2px;max-width:110px}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px}
+.book-del{color:var(--muted);font-size:18px;padding:8px;flex:none}
+#empty{padding:60px 30px;text-align:center;color:var(--muted);font-size:14px;line-height:2}
+#empty .mark{font-size:40px;display:block;margin-bottom:14px;font-family:"Hiragino Mincho ProN",serif;color:var(--accent)}
+#addBtn{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + var(--sab));
+  background:var(--accent);color:var(--accent-ink);
+  padding:15px 30px;border-radius:999px;font-size:15px;font-weight:600;letter-spacing:.06em;
+  box-shadow:0 6px 18px rgba(0,0,0,.18);z-index:5;
+}
+#addBtn:active{transform:translateX(-50%) scale(.96)}
+#memWarn{margin:0 16px;padding:10px 14px;border-radius:10px;background:#fff6e0;color:#7a5b00;font-size:12px;line-height:1.7}
+
+/* ===== リーダー ===== */
+#reader{position:fixed;inset:0;background:var(--paper);z-index:20;display:flex;flex-direction:column}
+#readerScroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#readerContent{
+  max-width:660px;margin:0 auto;
+  padding:calc(64px + var(--sat)) var(--rmargin,24px) calc(120px + var(--sab));
+  font-size:var(--fsize,17px);line-height:var(--lheight,1.95);letter-spacing:var(--lspace,0.04em);
+  font-family:var(--rfont);
+  font-feature-settings:"palt" 0;
+  text-align:justify;overflow-wrap:break-word;
+}
+/* 縦書き */
+#reader.vertical #readerScroll{overflow-y:hidden;overflow-x:auto}
+#reader.vertical #readerContent{
+  writing-mode:vertical-rl;height:100%;max-width:none;width:max-content;margin:0;
+  padding:calc(64px + var(--sat)) 28px calc(90px + var(--sab));
+  padding-left:32px;padding-right:32px;
+}
+#reader.vertical #readerContent h1,
+#reader.vertical #readerContent h2,
+#reader.vertical #readerContent h3{border-bottom:none;padding-bottom:0}
+#readerContent p{margin:0}
+#readerContent p+p{margin-top:calc(var(--pgap,0) * 1em)}
+#readerContent.indent p{text-indent:1em}
+#readerContent h1,#readerContent h2,#readerContent h3,#readerContent h4{
+  font-weight:700;line-height:1.6;margin:2.2em 0 1.1em;
+  font-family:"Hiragino Mincho ProN","Noto Serif JP",serif;
+}
+#readerContent h1{font-size:1.45em}
+#readerContent h2{font-size:1.25em}
+#readerContent h3{font-size:1.1em}
+#readerContent h4{font-size:1em}
+#readerContent h1:first-child{margin-top:.5em}
+#readerContent hr{border:none;text-align:center;margin:2.4em 0;color:var(--muted)}
+#readerContent hr::before{content:"＊　＊　＊";font-size:.85em;letter-spacing:.3em}
+#readerContent blockquote{
+  border-left:3px solid var(--line);padding-left:1em;color:var(--muted);margin:1.2em 0;
+}
+#reader.vertical #readerContent blockquote{border-left:none;border-top:3px solid var(--line);padding-left:0;padding-top:1em}
+#readerContent em{font-style:normal;text-emphasis:filled sesame;-webkit-text-emphasis:filled sesame}
+#readerContent strong{font-weight:700}
+#readerContent code{background:var(--paper2);border-radius:4px;padding:.1em .35em;font-size:.9em}
+#readerContent ul,#readerContent ol{padding-left:1.4em;margin:1em 0}
+#readerContent rt{font-size:.5em}
+
+/* バー */
+.bar{position:absolute;left:0;right:0;z-index:2;transition:opacity .22s,visibility .22s;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  background:color-mix(in srgb,var(--paper) 82%,transparent)}
+#topBar{top:0;padding:calc(10px + var(--sat)) 12px 10px;display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid var(--line)}
+#topBar .rtitle{flex:1;font-size:14px;font-weight:600;text-align:center;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;
+  font-family:"Hiragino Mincho ProN","Noto Serif JP",serif}
+#bottomBar{bottom:0;padding:12px 18px calc(14px + var(--sab));border-top:1px solid var(--line)}
+.bar-btn{padding:9px 14px;font-size:14px;color:var(--accent);font-weight:600;flex:none}
+#reader.bars-hidden .bar{opacity:0;visibility:hidden}
+#progRow{display:flex;align-items:center;gap:12px}
+#progPct{font-size:12px;color:var(--muted);width:44px;text-align:right;font-variant-numeric:tabular-nums}
+#progSlider{flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--line);outline:none}
+#progSlider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+  background:var(--accent);border:3px solid var(--paper);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+
+/* ===== 設定シート ===== */
+#sheetBack{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:30;opacity:0;transition:opacity .25s;pointer-events:none}
+#sheetBack.open{opacity:1;pointer-events:auto}
+#sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--paper);
+  border-radius:20px 20px 0 0;max-height:78vh;overflow-y:auto;
+  padding:10px 20px calc(24px + var(--sab));
+  transform:translateY(105%);transition:transform .28s cubic-bezier(.3,.9,.3,1);
+  box-shadow:0 -8px 30px rgba(0,0,0,.18);
+}
+#sheet.open{transform:translateY(0)}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 14px}
+.set-group{padding:14px 0;border-bottom:1px solid var(--line)}
+.set-group:last-child{border-bottom:none}
+.set-label{font-size:12px;color:var(--muted);letter-spacing:.1em;margin-bottom:10px}
+.seg{display:flex;background:var(--paper2);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;padding:9px 4px;border-radius:8px;font-size:13px;color:var(--muted);font-weight:500}
+.seg button.on{background:var(--paper);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.stepper{display:flex;align-items:center;gap:14px}
+.stepper button{
+  width:52px;height:40px;border-radius:10px;background:var(--paper2);
+  font-size:19px;font-weight:600;flex:none;
+}
+.stepper button:active{background:var(--line)}
+.stepper .val{flex:1;text-align:center;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.themes{display:flex;gap:10px}
+.theme-chip{
+  flex:1;height:52px;border-radius:12px;border:2px solid var(--line);
+  font-size:13px;font-weight:600;font-family:"Hiragino Mincho ProN",serif;letter-spacing:.1em;
+}
+.theme-chip.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- 本棚 -->
+<div id="shelf">
+  <div class="shelf-head">
+    <h1>書見</h1>
+    <p>本棚 — ファイルを追加して読み始める</p>
+  </div>
+  <div id="memWarn" class="hidden">この環境では保存機能が使えないため、追加した本はページを閉じると消えます。Safariで開くと本と設定が保存されます。</div>
+  <div id="bookList"></div>
+  <div id="empty">
+    <span class="mark">📖</span>
+    まだ本がありません。<br>
+    「本を追加」から .md / .txt ファイルを選んでください。<br>
+    Dropboxのファイルは「ブラウズ」→「Dropbox」から選べます。
+  </div>
+  <button id="addBtn">＋ 本を追加</button>
+  <input type="file" id="filePick" accept=".md,.txt,.markdown,text/plain,text/markdown" multiple class="hidden">
+</div>
+
+<!-- リーダー -->
+<div id="reader" class="hidden">
+  <div id="readerScroll"><div id="readerContent"></div></div>
+  <div class="bar" id="topBar">
+    <button class="bar-btn" id="backBtn">‹ 本棚</button>
+    <div class="rtitle" id="rTitle"></div>
+    <button class="bar-btn" id="setBtn">Aa</button>
+  </div>
+  <div class="bar" id="bottomBar">
+    <div id="progRow">
+      <input type="range" id="progSlider" min="0" max="1000" value="0">
+      <div id="progPct">0%</div>
+    </div>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div id="sheetBack"></div>
+<div id="sheet">
+  <div class="grab"></div>
+
+  <div class="set-group">
+    <div class="set-label">テーマ</div>
+    <div class="themes" id="themeRow"></div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">組み方向</div>
+    <div class="seg" id="dirSeg">
+      <button data-v="h">横書き</button><button data-v="v">縦書き</button>
+    </div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">書体</div>
+    <div class="seg" id="fontSeg">
+      <button data-v="mincho">明朝</button><button data-v="gothic">ゴシック</button><button data-v="maru">丸ゴシック</button>
+    </div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">文字サイズ</div>
+    <div class="stepper" data-key="fsize"><button data-d="-1">−</button><div class="val"></div><button data-d="1">＋</button></div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">行間</div>
+    <div class="stepper" data-key="lheight"><button data-d="-1">−</button><div class="val"></div><button data-d="1">＋</button></div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">字間</div>
+    <div class="stepper" data-key="lspace"><button data-d="-1">−</button><div class="val"></div><button data-d="1">＋</button></div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">余白</div>
+    <div class="stepper" data-key="rmargin"><button data-d="-1">−</button><div class="val"></div><button data-d="1">＋</button></div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">段落の間隔</div>
+    <div class="stepper" data-key="pgap"><button data-d="-1">−</button><div class="val"></div><button data-d="1">＋</button></div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">段落の字下げ</div>
+    <div class="seg" id="indentSeg">
+      <button data-v="0">なし</button><button data-v="1">一字下げ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============ 安全なストレージ ============ */
+let canStore = true;
+try { localStorage.setItem("_t","1"); localStorage.removeItem("_t"); } catch(e){ canStore = false; }
+
+const memSettings = {};
+const store = {
+  get(k, def){ if(!canStore) return (k in memSettings)? memSettings[k] : def;
+    try{ const v = localStorage.getItem(k); return v===null? def : JSON.parse(v);}catch(e){return def;} },
+  set(k, v){ if(!canStore){ memSettings[k]=v; return; } try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* IndexedDB(本の保存) — 使えない環境ではメモリに保持 */
+let db = null, memBooks = [];
+function openDB(){
+  return new Promise(res=>{
+    if(!("indexedDB" in window)) return res(null);
+    try{
+      const req = indexedDB.open("shoken", 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore("books", {keyPath:"id"});
+      req.onsuccess = e => res(e.target.result);
+      req.onerror = () => res(null);
+    }catch(e){ res(null); }
+  });
+}
+const dbAll = () => new Promise(res=>{
+  if(!db) return res(memBooks.slice());
+  const tx = db.transaction("books").objectStore("books").getAll();
+  tx.onsuccess = ()=>res(tx.result||[]); tx.onerror = ()=>res([]);
+});
+const dbPut = b => new Promise(res=>{
+  if(!db){ memBooks = memBooks.filter(x=>x.id!==b.id); memBooks.push(b); return res(); }
+  const tx = db.transaction("books","readwrite"); tx.objectStore("books").put(b);
+  tx.oncomplete = res; tx.onerror = res;
+});
+const dbDel = id => new Promise(res=>{
+  if(!db){ memBooks = memBooks.filter(x=>x.id!==id); return res(); }
+  const tx = db.transaction("books","readwrite"); tx.objectStore("books").delete(id);
+  tx.oncomplete = res; tx.onerror = res;
+});
+
+/* ============ テーマ ============ */
+const THEMES = {
+  shiro:  {label:"白",   paper:"#ffffff", paper2:"#f4f4f4", ink:"#2b2b2b", line:"#e2e2e2", muted:"#8a8a8a", accent:"#2f4f6f"},
+  kinari: {label:"生成り", paper:"#f7f2e7", paper2:"#efe8d8", ink:"#3d3830", line:"#e0d8c6", muted:"#948b7a", accent:"#7a5c3e"},
+  sumi:   {label:"墨",   paper:"#26282c", paper2:"#1d1f22", ink:"#d5d3cd", line:"#3b3e44", muted:"#84878e", accent:"#8fb0cc"},
+  yoru:   {label:"漆黒", paper:"#000000", paper2:"#121212", ink:"#b9b7b0", line:"#2a2a2a", muted:"#6d6d6d", accent:"#7d9db8"}
+};
+const FONTS = {
+  mincho:'"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif',
+  gothic:'-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif',
+  maru:'"Hiragino Maru Gothic ProN","Yu Gothic",-apple-system,sans-serif'
+};
+/* 設定の範囲 */
+const RANGES = {
+  fsize:  {min:12, max:30, step:1,   unit:"px", fmt:v=>v+"px"},
+  lheight:{min:1.4, max:2.8, step:0.1, unit:"", fmt:v=>v.toFixed(1)},
+  lspace: {min:0, max:0.2, step:0.02, unit:"em", fmt:v=>v.toFixed(2)+"em"},
+  rmargin:{min:12, max:56, step:4,  unit:"px", fmt:v=>v+"px"},
+  pgap:   {min:0, max:1.5, step:0.25, unit:"em", fmt:v=>v.toFixed(2)+"em"}
+};
+let settings = Object.assign({
+  theme:"kinari", dir:"h", font:"mincho",
+  fsize:17, lheight:1.95, lspace:0.04, rmargin:24, pgap:0, indent:1
+}, store.get("settings", {}));
+
+function applySettings(){
+  const t = THEMES[settings.theme] || THEMES.shiro;
+  const r = document.documentElement.style;
+  r.setProperty("--paper", t.paper); r.setProperty("--paper2", t.paper2);
+  r.setProperty("--ink", t.ink); r.setProperty("--line", t.line);
+  r.setProperty("--muted", t.muted); r.setProperty("--accent", t.accent);
+  r.setProperty("--fsize", settings.fsize+"px");
+  r.setProperty("--lheight", settings.lheight);
+  r.setProperty("--lspace", settings.lspace+"em");
+  r.setProperty("--rmargin", settings.rmargin+"px");
+  r.setProperty("--pgap", settings.pgap);
+  r.setProperty("--rfont", FONTS[settings.font]);
+  document.getElementById("reader").classList.toggle("vertical", settings.dir==="v");
+  document.getElementById("readerContent").classList.toggle("indent", settings.indent==1);
+  syncSheetUI();
+  store.set("settings", settings);
+}
+
+/* ============ Markdownパーサ ============ */
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function inline(s){
+  s = esc(s);
+  s = s.replace(/\|([^《|]+)《(.+?)》/g, "<ruby>$1<rt>$2</rt></ruby>");      // |任意《ルビ》
+  s = s.replace(/([一-龠々ヶ〆]+)《(.+?)》/g, "<ruby>$1<rt>$2</rt></ruby>"); // 漢字《ルビ》
+  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  s = s.replace(/`(.+?)`/g, "<code>$1</code>");
+  return s;
+}
+function renderMD(src){
+  const lines = src.replace(/\r\n?/g,"\n").split("\n");
+  const out = []; let para = [], list = null;
+  const flushP = ()=>{ if(para.length){ out.push("<p>"+para.map(inline).join("<br>")+"</p>"); para=[]; } };
+  const flushL = ()=>{ if(list){ out.push("<"+list.tag+">"+list.items.map(i=>"<li>"+inline(i)+"</li>").join("")+"</"+list.tag+">"); list=null; } };
+  for(const raw of lines){
+    const line = raw.replace(/\s+$/,"");
+    if(!line.trim()){ flushP(); flushL(); continue; }
+    let m;
+    if(m = line.match(/^(#{1,4})\s+(.*)/)){ flushP(); flushL();
+      out.push("<h"+m[1].length+">"+inline(m[2])+"</h"+m[1].length+">"); continue; }
+    if(/^(\*{3,}|-{3,}|_{3,})$/.test(line.trim())){ flushP(); flushL(); out.push("<hr>"); continue; }
+    if(m = line.match(/^>\s?(.*)/)){ flushP(); flushL();
+      out.push("<blockquote><p>"+inline(m[1])+"</p></blockquote>"); continue; }
+    if(m = line.match(/^[-*+]\s+(.*)/)){ flushP();
+      if(!list||list.tag!=="ul"){ flushL(); list={tag:"ul",items:[]}; } list.items.push(m[1]); continue; }
+    if(m = line.match(/^\d+\.\s+(.*)/)){ flushP();
+      if(!list||list.tag!=="ol"){ flushL(); list={tag:"ol",items:[]}; } list.items.push(m[1]); continue; }
+    flushL(); para.push(line);
+  }
+  flushP(); flushL();
+  return out.join("\n");
+}
+
+/* ============ 本棚 ============ */
+let books = [], currentBook = null;
+const $ = id => document.getElementById(id);
+
+function renderShelf(){
+  const listEl = $("bookList");
+  listEl.innerHTML = "";
+  $("empty").classList.toggle("hidden", books.length>0);
+  books.sort((a,b)=>(b.opened||0)-(a.opened||0));
+  for(const b of books){
+    const el = document.createElement("button");
+    el.className = "book";
+    const pct = Math.round((b.progress||0)*100);
+    el.innerHTML = '<div class="spine"></div><div class="book-info">'+
+      '<div class="book-title">'+esc(b.title)+'</div>'+
+      '<div class="book-meta"><span>'+pct+'%</span><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%"></div></div>'+
+      '<span>'+Math.round(b.text.length/1000)+'千字</span></div></div>'+
+      '<span class="book-del" data-del="'+b.id+'">✕</span>';
+    el.addEventListener("click", e=>{
+      const del = e.target.getAttribute("data-del");
+      if(del){ e.stopPropagation();
+        if(confirm("「"+b.title+"」を本棚から削除しますか？")){
+          books = books.filter(x=>x.id!==del); dbDel(del); renderShelf();
+        } return; }
+      openBook(b);
+    });
+    listEl.appendChild(el);
+  }
+}
+
+$("addBtn").addEventListener("click", ()=> $("filePick").click());
+$("filePick").addEventListener("change", async e=>{
+  for(const f of e.target.files){
+    const text = await f.text();
+    const title = f.name.replace(/\.(md|markdown|txt)$/i,"");
+    const book = { id: Date.now()+"-"+Math.random().toString(36).slice(2,7),
+      title, text, progress:0, opened:Date.now() };
+    books.push(book); await dbPut(book);
+  }
+  e.target.value = "";
+  renderShelf();
+});
+
+/* ============ リーダー ============ */
+const scrollEl = $("readerScroll");
+let saveTimer = null;
+
+function maxScroll(){
+  return settings.dir==="v"
+    ? Math.max(1, scrollEl.scrollWidth - scrollEl.clientWidth)
+    : Math.max(1, scrollEl.scrollHeight - scrollEl.clientHeight);
+}
+function getRatio(){
+  return settings.dir==="v"
+    ? Math.min(1, Math.abs(scrollEl.scrollLeft)/maxScroll())
+    : Math.min(1, scrollEl.scrollTop/maxScroll());
+}
+function setRatio(r){
+  if(settings.dir==="v"){
+    /* vertical-rl は右端が先頭。scrollLeft は環境により負値 */
+    const m = maxScroll();
+    scrollEl.scrollLeft = isRTLNegative() ? -r*m : r*m;
+  } else {
+    scrollEl.scrollTop = r*maxScroll();
+  }
+}
+let _rtlNeg = null;
+function isRTLNegative(){
+  if(_rtlNeg!==null) return _rtlNeg;
+  if(settings.dir!=="v") return false;
+  const prev = scrollEl.scrollLeft;
+  scrollEl.scrollLeft = -1;
+  _rtlNeg = scrollEl.scrollLeft < 0;
+  scrollEl.scrollLeft = prev;
+  return _rtlNeg;
+}
+
+function openBook(b){
+  currentBook = b;
+  b.opened = Date.now();
+  $("rTitle").textContent = b.title;
+  $("readerContent").innerHTML = renderMD(b.text);
+  $("reader").classList.remove("hidden","bars-hidden");
+  $("shelf").classList.add("hidden");
+  _rtlNeg = null;
+  applySettings();
+  requestAnimationFrame(()=>{ requestAnimationFrame(()=>{
+    setRatio(b.progress||0); updateProgUI();
+  });});
+  dbPut(b);
+}
+function closeBook(){
+  saveProgress();
+  $("reader").classList.add("hidden");
+  $("shelf").classList.remove("hidden");
+  renderShelf();
+  currentBook = null;
+}
+function saveProgress(){
+  if(!currentBook) return;
+  currentBook.progress = getRatio();
+  dbPut(currentBook);
+}
+function updateProgUI(){
+  const r = getRatio();
+  $("progSlider").value = Math.round(r*1000);
+  $("progPct").textContent = Math.round(r*100)+"%";
+}
+scrollEl.addEventListener("scroll", ()=>{
+  updateProgUI();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveProgress, 600);
+}, {passive:true});
+$("progSlider").addEventListener("input", e=>{
+  setRatio(e.target.value/1000); updateProgUI();
+});
+$("backBtn").addEventListener("click", closeBook);
+
+/* 中央タップでバー表示切替 */
+scrollEl.addEventListener("click", e=>{
+  const h = window.innerHeight;
+  if(e.clientY > h*0.22 && e.clientY < h*0.78 && !window.getSelection().toString()){
+    $("reader").classList.toggle("bars-hidden");
+  }
+});
+
+/* ============ 設定シート ============ */
+function openSheet(){ $("sheet").classList.add("open"); $("sheetBack").classList.add("open"); }
+function closeSheet(){ $("sheet").classList.remove("open"); $("sheetBack").classList.remove("open"); }
+$("setBtn").addEventListener("click", openSheet);
+$("sheetBack").addEventListener("click", closeSheet);
+
+/* テーマチップ生成 */
+const themeRow = $("themeRow");
+for(const key in THEMES){
+  const t = THEMES[key];
+  const b = document.createElement("button");
+  b.className = "theme-chip"; b.textContent = t.label;
+  b.style.background = t.paper; b.style.color = t.ink;
+  b.dataset.v = key;
+  b.addEventListener("click", ()=>{ settings.theme = key; withRatioKept(applySettings); });
+  themeRow.appendChild(b);
+}
+/* セグメント */
+function bindSeg(id, key, cb){
+  $(id).querySelectorAll("button").forEach(b=>{
+    b.addEventListener("click", ()=>{ settings[key] = isNaN(+b.dataset.v)? b.dataset.v : +b.dataset.v;
+      withRatioKept(applySettings); if(cb) cb(); });
+  });
+}
+bindSeg("dirSeg","dir", ()=>{ _rtlNeg = null; });
+bindSeg("fontSeg","font");
+bindSeg("indentSeg","indent");
+/* ステッパー */
+document.querySelectorAll(".stepper").forEach(st=>{
+  const key = st.dataset.key, rg = RANGES[key];
+  st.querySelectorAll("button").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      let v = settings[key] + rg.step * (+b.dataset.d);
+      v = Math.min(rg.max, Math.max(rg.min, Math.round(v*100)/100));
+      settings[key] = v;
+      withRatioKept(applySettings);
+    });
+  });
+});
+/* レイアウト変更時に読書位置を保つ */
+function withRatioKept(fn){
+  const inReader = !$("reader").classList.contains("hidden");
+  const r = inReader ? getRatio() : 0;
+  fn();
+  if(inReader) requestAnimationFrame(()=>{ setRatio(r); updateProgUI(); });
+}
+function syncSheetUI(){
+  themeRow.querySelectorAll(".theme-chip").forEach(b=>b.classList.toggle("on", b.dataset.v===settings.theme));
+  const segs = {dirSeg:"dir", fontSeg:"font", indentSeg:"indent"};
+  for(const id in segs){
+    $(id).querySelectorAll("button").forEach(b=>
+      b.classList.toggle("on", String(b.dataset.v)===String(settings[segs[id]])));
+  }
+  document.querySelectorAll(".stepper").forEach(st=>{
+    st.querySelector(".val").textContent = RANGES[st.dataset.key].fmt(settings[st.dataset.key]);
+  });
+}
+
+/* ページ離脱時に保存 */
+window.addEventListener("pagehide", saveProgress);
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveProgress(); });
+
+/* ============ 起動 ============ */
+(async ()=>{
+  db = await openDB();
+  if(!db && !canStore) $("memWarn").classList.remove("hidden");
+  books = await dbAll();
+  applySettings();
+  renderShelf();
+})();
+</script>
+</body>
+</html>
