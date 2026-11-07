@@ -157,17 +157,68 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   font-size:13px;font-weight:600;font-family:"Hiragino Mincho ProN",serif;letter-spacing:.1em;
 }
 .theme-chip.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.shelf-head{padding-bottom:0}
+.shelf-tabs{display:flex;gap:6px;margin-top:14px;padding-bottom:10px}
+.shelf-tabs button,.shelf-tool{min-height:40px;padding:8px 14px;border-radius:9px;font-size:14px}
+.shelf-tabs [aria-pressed="true"]{background:var(--accent);color:var(--paper)}
+.shelf-tabs button{display:flex;align-items:center;gap:7px}
+.folder-icon{display:inline-block;position:relative;width:19px;height:14px;border:1.7px solid currentColor;border-radius:3px;vertical-align:middle}
+.folder-icon:before{content:"";position:absolute;width:7px;height:3px;left:-1.7px;top:-5px;border:1.7px solid currentColor;border-bottom:0;border-radius:3px 4px 0 0}
+#folderRack{--row:115px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(21%,132px),1fr));grid-auto-rows:var(--row);gap:0 8px;padding:0 12px;border:6px solid #ae8053;border-top:8px solid #c49a6c;border-bottom:0;
+ background:repeating-linear-gradient(0deg,#97704b 0px,#c39a70 5px,#e0b88a 9px,#88603d 10px,transparent 17px,transparent var(--row)),repeating-linear-gradient(93deg,#a88159 0px,#af865d 3px,#a78059 7px,#a88159 30px);
+ box-shadow:inset 0 4px 10px #50331c77}
+.folder-card{position:relative;align-self:end;min-width:0;height:77px;margin-bottom:10px;background:linear-gradient(145deg,#f7e5c4,#e6cca3);color:#503923;border:1px solid #fbeed7;border-radius:5px 7px 6px 6px;box-shadow:1px 3px 5px #52391e77;display:grid;align-content:center;justify-items:center;gap:5px;padding:5px}
+.folder-card:before{content:"";position:absolute;bottom:100%;left:1px;width:42%;height:7px;background:#e9cba0;border-radius:5px 8px 0 0}
+.folder-card strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 15px/1.3 "Hiragino Mincho ProN",serif}
+.folder-card small{font-size:11px}
+.folder-card[aria-pressed="true"]{outline:2px solid #684727;outline-offset:-4px}
+.folder-new{background:#553a2033;color:#fff5e4;border:1px dashed currentColor;box-shadow:none;font-size:12px}
+.folder-new:before{display:none}.folder-new b{font-size:22px;font-weight:400}
+#collection{max-width:920px;margin:18px auto 0}
+.collection-head{display:flex;align-items:center;gap:5px;padding:0 16px}
+.collection-head h2{flex:1;min-width:0;overflow-wrap:anywhere;font:600 19px "Hiragino Mincho ProN",serif}
+.shelf-tool{padding:6px 9px;color:var(--accent);border:1px solid var(--line);background:var(--paper)}
+#bookList{padding-top:10px}
+.book{padding:0 5px 0 0;gap:0}
+.book:active{transform:none}
+.book-open{flex:1;min-width:0;display:flex;gap:14px;text-align:left;padding:12px}
+.book-menu{font-weight:700;min-height:44px;min-width:44px;color:var(--accent)}
+#shelfDialog{position:fixed;margin:auto;width:min(92vw,420px);max-height:80dvh;border:1px solid var(--line);border-radius:16px;padding:20px;background:var(--paper);color:var(--ink);box-shadow:0 12px 42px #0003}
+#shelfDialog::backdrop{background:#21180e66}
+#shelfDialog h2{font:600 18px "Hiragino Mincho ProN",serif;overflow-wrap:anywhere;margin-bottom:14px}
+#dialogBody{display:grid;gap:8px}
+#dialogBody input[type=text],#dialogBody select{width:100%;padding:10px;border-radius:7px;background:var(--paper2);color:var(--ink);font:inherit;border:1px solid var(--line)}
+#dialogBody label{font-size:14px}
+.checklist{max-height:43dvh;overflow:auto}
+.checklist label{display:flex;gap:10px;align-items:center;min-height:44px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.dialog-actions button,#dialogBody button{min-height:42px;padding:8px 12px;border-radius:8px;background:var(--paper2)}
+.dialog-actions .primary{color:var(--paper);background:var(--accent)}
+#dialogBody .danger{color:#aa4434}
+#folderEmpty{padding:22px 16px;color:var(--muted);font-size:14px;text-align:center}
 </style>
 </head>
 <body>
 
 <!-- 本棚 -->
-<div id="shelf">
+<div id="shelf" inert>
   <div class="shelf-head">
     <h1>書見</h1>
-    <p>本棚 — ファイルを追加して読み始める</p>
+    <nav class="shelf-tabs" aria-label="本の表示">
+      <button id="allTab">すべて <span id="bookCount"></span></button>
+      <button id="folderTab" aria-pressed="true"><span class="folder-icon" aria-hidden="true"></span>本棚</button>
+    </nav>
   </div>
   <div id="memWarn" class="hidden">この環境では保存機能が使えないため、追加した本はページを閉じると消えます。Safariで開くと本と設定が保存されます。</div>
+  <div id="folderRack" aria-label="フォルダ"></div>
+  <section id="collection">
+    <div class="collection-head">
+      <button id="leaveFolder" class="shelf-tool hidden" aria-label="フォルダを閉じる">‹</button>
+      <h2 id="collectionName">すべての本</h2>
+      <button id="chooseBooks" class="shelf-tool hidden">本をまとめる</button>
+      <button id="editFolder" class="shelf-tool hidden" aria-label="フォルダの編集">•••</button>
+    </div>
+    <div id="folderEmpty" class="hidden">このフォルダにはまだ本がありません。</div>
   <div id="bookList"></div>
   <div id="empty">
     <span class="mark">📖</span>
@@ -175,9 +226,21 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
     「本を追加」から .md / .txt ファイルを選んでください。<br>
     Dropboxのファイルは「ブラウズ」→「Dropbox」から選べます。
   </div>
+  </section>
   <button id="addBtn">＋ 本を追加</button>
   <input type="file" id="filePick" accept=".md,.txt,.markdown,text/plain,text/markdown" multiple class="hidden">
 </div>
+
+<dialog id="shelfDialog" aria-labelledby="dialogTitle">
+  <form id="dialogForm">
+    <h2 id="dialogTitle"></h2>
+    <div id="dialogBody"></div>
+    <div class="dialog-actions">
+      <button type="button" id="cancelDialog">閉じる</button>
+      <button id="saveDialog" class="primary" type="submit">保存</button>
+    </div>
+  </form>
+</dialog>
 
 <!-- リーダー -->
 <div id="reader" class="hidden">
@@ -271,9 +334,21 @@ function openDB(){
   return new Promise(res=>{
     if(!("indexedDB" in window)) return res(null);
     try{
-      const req = indexedDB.open("shoken", 1);
-      req.onupgradeneeded = e => e.target.result.createObjectStore("books", {keyPath:"id"});
-      req.onsuccess = e => res(e.target.result);
+      const req = indexedDB.open("shoken", 2);
+      req.onupgradeneeded = e => {
+        const database = e.target.result;
+        if(e.oldVersion < 1) database.createObjectStore("books", {keyPath:"id"});
+        if(e.oldVersion < 2) database.createObjectStore("folders", {keyPath:"id"});
+      };
+      req.onblocked = () => {
+        $("memWarn").textContent = "本棚を更新するため、ほかに開いている「書見」のタブを閉じてください。";
+        $("memWarn").classList.remove("hidden");
+      };
+      req.onsuccess = () => {
+        req.result.onversionchange = () => { req.result.close(); location.reload(); };
+        $("memWarn").classList.add("hidden");
+        res(req.result);
+      };
       req.onerror = () => res(null);
     }catch(e){ res(null); }
   });
@@ -283,17 +358,11 @@ const dbAll = () => new Promise(res=>{
   const tx = db.transaction("books").objectStore("books").getAll();
   tx.onsuccess = ()=>res(tx.result||[]); tx.onerror = ()=>res([]);
 });
-const dbPut = b => new Promise(res=>{
+const dbPut = b => new Promise((res,reject)=>{
   if(!db){ memBooks = memBooks.filter(x=>x.id!==b.id); memBooks.push(b); return res(); }
   const tx = db.transaction("books","readwrite"); tx.objectStore("books").put(b);
-  tx.oncomplete = res; tx.onerror = res;
+  tx.oncomplete = res; tx.onabort = () => reject(tx.error);
 });
-const dbDel = id => new Promise(res=>{
-  if(!db){ memBooks = memBooks.filter(x=>x.id!==id); return res(); }
-  const tx = db.transaction("books","readwrite"); tx.objectStore("books").delete(id);
-  tx.oncomplete = res; tx.onerror = res;
-});
-
 /* ============ テーマ ============ */
 const THEMES = {
   shiro:  {label:"白",   paper:"#ffffff", paper2:"#f4f4f4", ink:"#2b2b2b", line:"#e2e2e2", muted:"#8a8a8a", accent:"#2f4f6f"},
@@ -373,47 +442,227 @@ function renderMD(src){
 }
 
 /* ============ 本棚 ============ */
-let books = [], currentBook = null;
+let books = [], folders = [], currentBook = null;
+let showFolders = true, activeFolder = null, importFolder = null;
 const $ = id => document.getElementById(id);
+const newId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(36).slice(2);
+const folderById = id => folders.find(folder => folder.id === id);
+const ownerOf = bookId => folders.find(folder => folder.bookIds.includes(bookId));
+function element(tag, text, className){
+  const node = document.createElement(tag);
+  if(text != null) node.textContent = text;
+  if(className) node.className = className;
+  return node;
+}
+function button(label, action, className){
+  const node = element("button", label, className);
+  node.type = "button";
+  node.addEventListener("click", action);
+  return node;
+}
 
-function renderShelf(){
-  const listEl = $("bookList");
-  listEl.innerHTML = "";
-  $("empty").classList.toggle("hidden", books.length>0);
-  books.sort((a,b)=>(b.opened||0)-(a.opened||0));
-  for(const b of books){
-    const el = document.createElement("button");
-    el.className = "book";
-    const pct = Math.round((b.progress||0)*100);
-    el.innerHTML = '<div class="spine"></div><div class="book-info">'+
-      '<div class="book-title">'+esc(b.title)+'</div>'+
-      '<div class="book-meta"><span>'+pct+'%</span><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%"></div></div>'+
-      '<span>'+Math.round(b.text.length/1000)+'千字</span></div></div>'+
-      '<span class="book-del" data-del="'+b.id+'">✕</span>';
-    el.addEventListener("click", e=>{
-      const del = e.target.getAttribute("data-del");
-      if(del){ e.stopPropagation();
-        if(confirm("「"+b.title+"」を本棚から削除しますか？")){
-          books = books.filter(x=>x.id!==del); dbDel(del); renderShelf();
-        } return; }
-      openBook(b);
+// Folder membership lives outside book records so saving progress cannot undo a move.
+async function changeShelf(edit, bookChange = {}){
+  if(!db){
+    const next = folders.map(folder => ({...folder, bookIds:[...folder.bookIds]}));
+    edit(next);
+    folders = next;
+    if(bookChange.put) memBooks.push(bookChange.put);
+    if(bookChange.remove) memBooks = memBooks.filter(book => book.id !== bookChange.remove);
+  }else{
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(bookChange.put || bookChange.remove ? ["folders","books"] : ["folders"], "readwrite");
+      const folderStore = tx.objectStore("folders");
+      const request = folderStore.getAll();
+      let problem;
+      request.onsuccess = () => {
+        try{
+          const rows = request.result;
+          const before = new Map(rows.map(row => [row.id, JSON.stringify(row)]));
+          edit(rows);
+          for(const row of rows){
+            if(before.get(row.id) !== JSON.stringify(row)) folderStore.put(row);
+            before.delete(row.id);
+          }
+          for(const id of before.keys()) folderStore.delete(id);
+          if(bookChange.put) tx.objectStore("books").put(bookChange.put);
+          if(bookChange.remove) tx.objectStore("books").delete(bookChange.remove);
+        }catch(err){ problem = err; tx.abort(); }
+      };
+      tx.oncomplete = resolve;
+      tx.onabort = () => reject(problem || tx.error);
     });
-    listEl.appendChild(el);
+  }
+}
+function moveBooks(rows, ids, destination){
+  const target = rows.find(folder => folder.id === destination);
+  if(destination && !target) throw new Error("移動先のフォルダが見つかりません。");
+  const moving = new Set(ids);
+  for(const folder of rows) folder.bookIds = folder.bookIds.filter(id => !moving.has(id));
+  if(target) target.bookIds.push(...moving);
+}
+async function refreshShelf(){
+  const [savedBooks,savedFolders] = await Promise.all([dbAll(), db ? new Promise((resolve,reject) => {
+    const req = db.transaction("folders").objectStore("folders").getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }) : folders]);
+  books = savedBooks;
+  folders = savedFolders.sort((a,b) => a.created-b.created || a.id.localeCompare(b.id));
+  if(!folderById(activeFolder)) activeFolder = null;
+  renderShelf();
+}
+function renderShelf(){
+  const folder = folderById(activeFolder);
+  const ids = new Set(books.map(book => book.id));
+  $("bookCount").textContent = "("+books.length+")";
+  $("folderTab").setAttribute("aria-pressed",showFolders);
+  $("allTab").setAttribute("aria-pressed",!showFolders);
+  $("folderRack").classList.toggle("hidden",!showFolders);
+  const rack = $("folderRack");
+  rack.replaceChildren();
+  for(const item of folders){
+    const card = button("",() => { activeFolder = item.id; renderShelf(); },"folder-card");
+    const icon = element("span",null,"folder-icon");
+    icon.setAttribute("aria-hidden","true");
+    card.append(icon,element("strong",item.name),element("small",item.bookIds.filter(id => ids.has(id)).length+"冊"));
+    card.setAttribute("aria-pressed",item.id === activeFolder);
+    rack.append(card);
+  }
+  const create = button("",() => nameFolder(null),"folder-card folder-new");
+  create.append(element("b","＋"),element("span","フォルダを作成"));
+  rack.append(create);
+  for(const id of ["leaveFolder","chooseBooks","editFolder"]) $(id).classList.toggle("hidden",!folder);
+  const members = folder && new Set(folder.bookIds);
+  const visible = books.filter(book => !members || members.has(book.id)).sort((a,b) => (b.opened||0)-(a.opened||0));
+  $("collectionName").textContent = folder ? folder.name+"（"+visible.length+"冊）" : "すべての本";
+  $("empty").classList.toggle("hidden",!!folder || books.length > 0);
+  $("folderEmpty").classList.toggle("hidden",!folder || visible.length > 0);
+  const list = $("bookList");
+  list.replaceChildren();
+  for(const book of visible){
+    const row = element("div",null,"book");
+    const open = button("",() => openBook(book),"book-open");
+    const pct = Math.round((book.progress||0)*100);
+    const info = element("div",null,"book-info");
+    const meta = element("div",null,"book-meta");
+    const track = element("div",null,"prog-track");
+    const fill = element("div",null,"prog-fill");
+    fill.style.width = pct+"%";
+    track.append(fill);
+    meta.append(element("span",pct+"%"),track,element("span",Math.round(book.text.length/1000)+"千字"));
+    info.append(element("div",book.title,"book-title"),meta);
+    open.append(element("div",null,"spine"),info);
+    const menu = button("•••",() => bookMenu(book),"book-menu");
+    menu.setAttribute("aria-label",book.title+"の操作");
+    row.append(open,menu);
+    list.append(row);
   }
 }
 
-$("addBtn").addEventListener("click", ()=> $("filePick").click());
-$("filePick").addEventListener("change", async e=>{
-  for(const f of e.target.files){
-    const text = await f.text();
-    const title = f.name.replace(/\.(md|markdown|txt)$/i,"");
-    const book = { id: Date.now()+"-"+Math.random().toString(36).slice(2,7),
-      title, text, progress:0, opened:Date.now() };
-    books.push(book); await dbPut(book);
+let submitDialog = null;
+function dialog(title, content, saveLabel, action){
+  $("dialogTitle").textContent = title;
+  $("dialogBody").replaceChildren(...content);
+  $("saveDialog").classList.toggle("hidden",!action);
+  $("saveDialog").textContent = saveLabel || "保存";
+  submitDialog = action;
+  if(!$("shelfDialog").open) $("shelfDialog").showModal();
+}
+$("cancelDialog").onclick = () => $("shelfDialog").close();
+$("dialogForm").onsubmit = async event => {
+  event.preventDefault();
+  if(!submitDialog || $("saveDialog").disabled) return;
+  $("saveDialog").disabled = true;
+  try{
+    await submitDialog();
+    $("shelfDialog").close();
+  }catch(err){ alert(err.message || "変更を保存できませんでした。"); }
+  finally{ $("saveDialog").disabled = false; await refreshShelf(); }
+};
+function nameFolder(folder){
+  const input = element("input");
+  input.type = "text"; input.required = true; input.maxLength = 80;
+  input.placeholder = "フォルダ名"; input.value = folder?.name || "";
+  input.setAttribute("aria-label","フォルダ名");
+  dialog(folder ? "フォルダ名を変更" : "フォルダを作成",[input],folder ? "保存" : "作成",async () => {
+    const name = input.value.trim();
+    if(!name) throw new Error("フォルダ名を入力してください。");
+    const id = folder?.id || newId();
+    await changeShelf(rows => {
+      if(rows.some(row => row.id !== id && row.name === name)) throw new Error("同じ名前のフォルダがあります。");
+      if(folder){
+        const item = rows.find(row => row.id === id);
+        if(!item) throw new Error("フォルダが見つかりません。");
+        item.name = name;
+      }else rows.push({id,name,created:Date.now(),bookIds:[]});
+    });
+    activeFolder = id;
+  });
+  input.focus();
+}
+$("editFolder").onclick = () => {
+  const folder = folderById(activeFolder);
+  const rename = button("名前を変更",() => nameFolder(folder));
+  const remove = button("フォルダを削除",() => {
+    dialog("「"+folder.name+"」を削除",[element("p","中の本は「すべて」に残ります。")],"削除",() => changeShelf(rows => {
+      const index = rows.findIndex(row => row.id === folder.id);
+      if(index >= 0) rows.splice(index,1);
+    }));
+  },"danger");
+  dialog(folder.name,[rename,remove]);
+};
+$("chooseBooks").onclick = () => {
+  const folder = folderById(activeFolder);
+  const available = books.filter(book => !folder.bookIds.includes(book.id));
+  const list = element("div",null,"checklist");
+  for(const book of available){
+    const label = element("label");
+    const input = element("input");
+    input.type = "checkbox"; input.value = book.id;
+    const owner = ownerOf(book.id);
+    label.append(input,element("span",book.title+(owner ? "（"+owner.name+"）" : "")));
+    list.append(label);
   }
-  e.target.value = "";
+  if(!available.length) list.append(element("p","追加できる本はありません。"));
+  dialog("「"+folder.name+"」に本をまとめる",[list],"選んだ本を移動",available.length ? () => {
+    const ids = Array.from(list.querySelectorAll(":checked"), input => input.value);
+    return changeShelf(rows => moveBooks(rows,ids,folder.id));
+  } : null);
+};
+function bookMenu(book){
+  const select = element("select");
+  select.id = "moveDestination";
+  select.add(new Option("未分類",""));
+  for(const folder of folders) select.add(new Option(folder.name,folder.id));
+  select.value = ownerOf(book.id)?.id || "";
+  const label = element("label","移動先のフォルダ");
+  label.htmlFor = select.id;
+  const remove = button("本を削除",() => {
+    dialog("「"+book.title+"」を削除",[element("p","本文と読書位置がこの端末の本棚から削除されます。")],"削除",
+      () => changeShelf(rows => moveBooks(rows,[book.id],null),{remove:book.id}));
+  },"danger");
+  dialog(book.title,[label,select,remove],"保存",() => changeShelf(rows => moveBooks(rows,[book.id],select.value)));
+}
+function switchView(useFolders){
+  showFolders = useFolders;
+  activeFolder = null;
   renderShelf();
-});
+}
+$("allTab").onclick = () => switchView(false);
+$("folderTab").onclick = $("leaveFolder").onclick = () => switchView(true);
+$("addBtn").onclick = () => { importFolder = activeFolder; $("filePick").click(); };
+$("filePick").onchange = async event => {
+  const target = importFolder;
+  try{
+    for(const file of Array.from(event.target.files)){
+      const book = {id:newId(),title:file.name.replace(/\.(md|markdown|txt)$/i,""),
+        text:await file.text(),progress:0,opened:Date.now()};
+      await changeShelf(rows => moveBooks(rows,[book.id],target),{put:book});
+    }
+  }catch(err){ alert("本を追加できませんでした。"+err.message); }
+  finally{ event.target.value = ""; await refreshShelf(); }
+};
 
 /* ============ リーダー ============ */
 const scrollEl = $("readerScroll");
@@ -563,10 +812,11 @@ document.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveProg
 /* ============ 起動 ============ */
 (async ()=>{
   db = await openDB();
-  if(!db && !canStore) $("memWarn").classList.remove("hidden");
-  books = await dbAll();
+  if(!db) $("memWarn").classList.remove("hidden");
   applySettings();
-  renderShelf();
+  await refreshShelf();
+  $("shelf").inert = false;
+  window.addEventListener("focus", () => { if(!currentBook) refreshShelf(); });
 })();
 </script>
 </body>
