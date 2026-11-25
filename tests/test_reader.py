@@ -46,6 +46,9 @@ class ReaderTest(unittest.TestCase):
     def swipe_row(self, dx, dy=0):
         box = self.page.locator(".book").first.bounding_box()
         x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        self.swipe(x, y, dx, dy)
+
+    def swipe(self, x, y, dx, dy=0):
         session = self.context.new_cdp_session(self.page)
 
         def touch(kind, points):
@@ -120,3 +123,45 @@ class ReaderTest(unittest.TestCase):
         for value, heading in [("0", "冒頭"), ("1000", "結末")]:
             page.locator("#progSlider").fill(value)
             expect(page.get_by_role("heading", name=heading)).to_be_in_viewport()
+
+    def test_contents_drawer_jumps_in_both_directions(self):
+        page = self.page
+        page.locator(".book-open").tap()
+        drawer = page.get_by_role("dialog", name="目次")
+        for direction in ("横書き", "縦書き"):
+            page.locator("#setBtn").tap()
+            page.get_by_role("button", name=direction, exact=True).tap()
+            page.locator("#sheetBack").tap(position={"x": 5, "y": 5})
+            self.swipe(16, 400, 120)
+            expect(drawer).to_be_visible()
+            drawer.get_by_role("button", name="結末").tap()
+            expect(drawer).to_be_hidden()
+            expect(page.get_by_role("heading", name="結末")).to_be_in_viewport()
+            page.get_by_role("button", name="目次").tap()
+            drawer.get_by_role("button", name="冒頭").tap()
+            expect(page.get_by_role("heading", name="冒頭")).to_be_in_viewport()
+
+    def test_contents_tracks_each_books_headings(self):
+        page = self.page
+        filler = ("長い段落。" * 40 + "\n\n") * 30
+        text = "## 同名\n\n" + filler + "###### **同名**\n\n" + filler
+        with page.expect_file_chooser() as chooser:
+            page.locator("#addBtn").tap()
+        chooser.value.set_files([
+            {"name": "章立て.md", "mimeType": "text/markdown", "buffer": text.encode()},
+            {"name": "短文.txt", "mimeType": "text/plain", "buffer": "本文".encode()},
+        ])
+        page.get_by_role("button", name="章立て 0%").tap()
+        page.locator("#contentsBtn").tap()
+        panel = page.locator("#contentsPanel")
+        entries = panel.get_by_role("button", name="同名", exact=True)
+        expect(entries).to_have_count(2)
+        entries.nth(1).tap()
+        expect(page.get_by_role("heading", name="同名", level=6)).to_be_in_viewport()
+        page.locator("#backBtn").tap()
+        page.get_by_role("button", name="短文 0%").tap()
+        page.locator("#contentsBtn").tap()
+        expect(panel.get_by_text("この本には見出しがありません。")).to_be_visible()
+        expect(entries).to_have_count(0)
+        self.swipe(180, 250, -120)
+        expect(panel).to_be_hidden()
