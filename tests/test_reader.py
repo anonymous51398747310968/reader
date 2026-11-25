@@ -43,15 +43,60 @@ class ReaderTest(unittest.TestCase):
         )
         expect(self.page.locator(".book-title")).to_have_text("長編")
 
+    def swipe_row(self, dx, dy=0):
+        box = self.page.locator(".book").first.bounding_box()
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        session = self.context.new_cdp_session(self.page)
+
+        def touch(kind, points):
+            session.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": points})
+
+        touch("touchStart", [{"x": x, "y": y}])
+        for step in range(1, 7):
+            touch("touchMove", [{"x": x + dx * step / 6, "y": y + dy * step / 6}])
+        touch("touchEnd", [])
+        session.detach()
+
+    def test_vertical_drag_and_reverse_swipe(self):
+        remove = self.page.get_by_role("button", name="長編を削除")
+        self.swipe_row(3, -90)
+        expect(self.page.locator(".book-del")).not_to_be_in_viewport(ratio=0.01)
+        expect(self.page.locator("#reader")).to_be_hidden()
+        self.swipe_row(-120)
+        expect(remove).to_be_in_viewport(ratio=0.95)
+        self.swipe_row(120)
+        expect(self.page.locator(".book-del")).not_to_be_in_viewport(ratio=0.01)
+        self.page.locator(".book-open").tap()
+        expect(self.page.locator("#reader")).to_be_visible()
+
+    def test_scroll_a_long_shelf(self):
+        page = self.page
+        with page.expect_file_chooser() as chooser:
+            page.locator("#addBtn").tap()
+        chooser.value.set_files([
+            {"name": f"本{i}.txt", "mimeType": "text/plain", "buffer": b"text"}
+            for i in range(16)
+        ])
+        expect(page.locator(".book")).to_have_count(17)
+        self.swipe_row(4, -120)
+        page.wait_for_function("window.scrollY > 0")
+        expect(page.locator(".book.swiped")).to_have_count(0)
+        expect(page.locator("#reader")).to_be_hidden()
+
     def test_delete_while_another_tab_is_reading(self):
         reader = self.context.new_page()
         reader.goto(self.url)
         reader.locator(".book-open").tap()
+        self.page.bring_to_front()
 
         remove = self.page.get_by_role("button", name="長編を削除", exact=True)
+        expect(self.page.locator(".book-del")).not_to_be_in_viewport(ratio=0.01)
+        self.swipe_row(-120)
         remove.tap()
         self.page.locator("#cancelDialog").tap()
         expect(self.page.locator(".book-open")).to_have_count(1)
+        expect(self.page.locator(".book-del")).not_to_be_in_viewport(ratio=0.01)
+        self.swipe_row(-120)
         remove.tap()
         self.page.locator("#saveDialog").tap()
         expect(self.page.locator(".book-open")).to_have_count(0)
