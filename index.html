@@ -51,7 +51,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 .book-meta{font-size:12px;color:var(--muted);margin-top:5px;display:flex;gap:10px;align-items:center}
 .prog-track{flex:1;height:3px;background:var(--line);border-radius:2px;max-width:110px}
 .prog-fill{height:100%;background:var(--accent);border-radius:2px}
-.book-del{color:var(--muted);font-size:18px;padding:8px;flex:none}
+.book-del{color:var(--accent);font-size:14px;min-width:44px;min-height:44px;flex:none}
 #empty{padding:60px 30px;text-align:center;color:var(--muted);font-size:14px;line-height:2}
 #empty .mark{font-size:40px;display:block;margin-bottom:14px;font-family:"Hiragino Mincho ProN",serif;color:var(--accent)}
 #addBtn{
@@ -75,17 +75,16 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   text-align:justify;overflow-wrap:break-word;
 }
 /* 縦書き */
-#reader.vertical #readerScroll{overflow-y:hidden;overflow-x:auto}
+#reader.vertical #readerScroll{writing-mode:vertical-rl;overflow-y:hidden;overflow-x:auto}
 #reader.vertical #readerContent{
   writing-mode:vertical-rl;height:100%;max-width:none;width:max-content;margin:0;
-  padding:calc(64px + var(--sat)) 28px calc(90px + var(--sab));
-  padding-left:32px;padding-right:32px;
+  padding:calc(64px + var(--sat)) var(--rmargin,24px) calc(90px + var(--sab));
 }
 #reader.vertical #readerContent h1,
 #reader.vertical #readerContent h2,
 #reader.vertical #readerContent h3{border-bottom:none;padding-bottom:0}
 #readerContent p{margin:0}
-#readerContent p+p{margin-top:calc(var(--pgap,0) * 1em)}
+#readerContent p+p{margin-block-start:calc(var(--pgap,0) * 1em)}
 #readerContent.indent p{text-indent:1em}
 #readerContent h1,#readerContent h2,#readerContent h3,#readerContent h4{
   font-weight:700;line-height:1.6;margin:2.2em 0 1.1em;
@@ -358,9 +357,16 @@ const dbAll = () => new Promise(res=>{
   const tx = db.transaction("books").objectStore("books").getAll();
   tx.onsuccess = ()=>res(tx.result||[]); tx.onerror = ()=>res([]);
 });
-const dbPut = b => new Promise((res,reject)=>{
-  if(!db){ memBooks = memBooks.filter(x=>x.id!==b.id); memBooks.push(b); return res(); }
-  const tx = db.transaction("books","readwrite"); tx.objectStore("books").put(b);
+const saveBookIfPresent = book => new Promise((res,reject)=>{
+  if(!db){
+    const index = memBooks.findIndex(item => item.id === book.id);
+    if(index >= 0) memBooks[index] = book;
+    return res();
+  }
+  const tx = db.transaction("books","readwrite");
+  const bookStore = tx.objectStore("books");
+  const exists = bookStore.count(book.id);
+  exists.onsuccess = () => { if(exists.result) bookStore.put(book); };
   tx.oncomplete = res; tx.onabort = () => reject(tx.error);
 });
 /* ============ テーマ ============ */
@@ -555,7 +561,9 @@ function renderShelf(){
     open.append(element("div",null,"spine"),info);
     const menu = button("•••",() => bookMenu(book),"book-menu");
     menu.setAttribute("aria-label",book.title+"の操作");
-    row.append(open,menu);
+    const remove = button("削除",() => confirmBookDeletion(book),"book-del");
+    remove.setAttribute("aria-label",book.title+"を削除");
+    row.append(open,menu,remove);
     list.append(row);
   }
 }
@@ -630,6 +638,10 @@ $("chooseBooks").onclick = () => {
     return changeShelf(rows => moveBooks(rows,ids,folder.id));
   } : null);
 };
+function confirmBookDeletion(book){
+  dialog("「"+book.title+"」を削除",[element("p","本文と読書位置がこの端末の本棚から削除されます。")],"削除",
+    () => changeShelf(rows => moveBooks(rows,[book.id],null),{remove:book.id}));
+}
 function bookMenu(book){
   const select = element("select");
   select.id = "moveDestination";
@@ -638,10 +650,7 @@ function bookMenu(book){
   select.value = ownerOf(book.id)?.id || "";
   const label = element("label","移動先のフォルダ");
   label.htmlFor = select.id;
-  const remove = button("本を削除",() => {
-    dialog("「"+book.title+"」を削除",[element("p","本文と読書位置がこの端末の本棚から削除されます。")],"削除",
-      () => changeShelf(rows => moveBooks(rows,[book.id],null),{remove:book.id}));
-  },"danger");
+  const remove = button("本を削除",() => confirmBookDeletion(book),"danger");
   dialog(book.title,[label,select,remove],"保存",() => changeShelf(rows => moveBooks(rows,[book.id],select.value)));
 }
 function switchView(useFolders){
@@ -690,7 +699,7 @@ function setRatio(r){
 let _rtlNeg = null;
 function isRTLNegative(){
   if(_rtlNeg!==null) return _rtlNeg;
-  if(settings.dir!=="v") return false;
+  if(scrollEl.scrollWidth <= scrollEl.clientWidth) return false;
   const prev = scrollEl.scrollLeft;
   scrollEl.scrollLeft = -1;
   _rtlNeg = scrollEl.scrollLeft < 0;
@@ -707,22 +716,22 @@ function openBook(b){
   $("shelf").classList.add("hidden");
   _rtlNeg = null;
   applySettings();
-  requestAnimationFrame(()=>{ requestAnimationFrame(()=>{
-    setRatio(b.progress||0); updateProgUI();
-  });});
-  dbPut(b);
+  setRatio(b.progress||0); updateProgUI();
+  saveBookIfPresent(b);
 }
-function closeBook(){
-  saveProgress();
+async function closeBook(){
+  clearTimeout(saveTimer);
+  try{ await saveProgress(); }
+  catch(err){ alert("読書位置を保存できませんでした。"); return; }
   $("reader").classList.add("hidden");
   $("shelf").classList.remove("hidden");
-  renderShelf();
   currentBook = null;
+  refreshShelf();
 }
 function saveProgress(){
   if(!currentBook) return;
   currentBook.progress = getRatio();
-  dbPut(currentBook);
+  return saveBookIfPresent(currentBook);
 }
 function updateProgUI(){
   const r = getRatio();
@@ -737,6 +746,7 @@ scrollEl.addEventListener("scroll", ()=>{
 $("progSlider").addEventListener("input", e=>{
   setRatio(e.target.value/1000); updateProgUI();
 });
+$("progSlider").addEventListener("change", saveProgress);
 $("backBtn").addEventListener("click", closeBook);
 
 /* 中央タップでバー表示切替 */
@@ -765,13 +775,15 @@ for(const key in THEMES){
   themeRow.appendChild(b);
 }
 /* セグメント */
-function bindSeg(id, key, cb){
+function bindSeg(id, key){
   $(id).querySelectorAll("button").forEach(b=>{
-    b.addEventListener("click", ()=>{ settings[key] = isNaN(+b.dataset.v)? b.dataset.v : +b.dataset.v;
-      withRatioKept(applySettings); if(cb) cb(); });
+    b.addEventListener("click", ()=> withRatioKept(() => {
+      settings[key] = isNaN(+b.dataset.v)? b.dataset.v : +b.dataset.v;
+      applySettings();
+    }));
   });
 }
-bindSeg("dirSeg","dir", ()=>{ _rtlNeg = null; });
+bindSeg("dirSeg","dir");
 bindSeg("fontSeg","font");
 bindSeg("indentSeg","indent");
 /* ステッパー */
@@ -791,7 +803,7 @@ function withRatioKept(fn){
   const inReader = !$("reader").classList.contains("hidden");
   const r = inReader ? getRatio() : 0;
   fn();
-  if(inReader) requestAnimationFrame(()=>{ setRatio(r); updateProgUI(); });
+  if(inReader){ setRatio(r); updateProgUI(); }
 }
 function syncSheetUI(){
   themeRow.querySelectorAll(".theme-chip").forEach(b=>b.classList.toggle("on", b.dataset.v===settings.theme));
