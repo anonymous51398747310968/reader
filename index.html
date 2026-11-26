@@ -118,10 +118,11 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 @media(prefers-reduced-motion:reduce){#contentsPanel[open]{animation:none}}
 .contents-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px 8px 20px;border-bottom:1px solid var(--line)}
 .contents-head h2{font-size:1.1rem}
-#contentsList{overflow:auto;overscroll-behavior:contain;padding:8px 0}
+#contentsList{position:relative;overflow:auto;overscroll-behavior:contain;padding:8px 0}
 #contentsList button{display:block;width:100%;min-height:44px;text-align:left;
   padding:10px 16px 10px calc(20px + var(--depth)*12px);overflow-wrap:anywhere;color:var(--ink)}
 #contentsList button:is(:hover,:focus-visible){background:var(--paper2)}
+#contentsList button[aria-current="location"]{color:var(--accent);font-weight:700;box-shadow:inset 3px 0 var(--accent)}
 #contentsList p{padding:12px 20px;color:var(--muted)}
 
 /* バー */
@@ -802,11 +803,12 @@ $("backBtn").addEventListener("click", closeBook);
 
 /* 左端から引き出す目次 */
 const contentsPanel = $("contentsPanel");
+let contentsHeadings;
 function buildContents(){
   const list = $("contentsList");
   list.replaceChildren();
-  const headings = $("readerContent").querySelectorAll("h1,h2,h3,h4,h5,h6");
-  for(const heading of headings){
+  contentsHeadings = $("readerContent").querySelectorAll("h1,h2,h3,h4,h5,h6");
+  for(const heading of contentsHeadings){
     const title = heading.cloneNode(true);
     title.querySelectorAll("rt").forEach(rt => rt.remove());
     const item = button(title.textContent,() => {
@@ -818,10 +820,33 @@ function buildContents(){
     item.style.setProperty("--depth",Number(heading.tagName.slice(1))-1);
     list.append(item);
   }
-  if(!headings.length) list.append(element("p","この本には見出しがありません。"));
+  if(!contentsHeadings.length) list.append(element("p","この本には見出しがありません。"));
   list.scrollTop = 0;
 }
-function openContents(){ contentsPanel.showModal(); }
+function currentHeadingIndex(){
+  if(getRatio() >= 1) return contentsHeadings.length - 1;
+  const viewport = scrollEl.getBoundingClientRect();
+  const vertical = settings.dir === "v";
+  // Use the same reading edge as a heading jump, allowing for pixel rounding.
+  const inset = parseFloat(getComputedStyle(contentsHeadings[0]).scrollMarginBlockStart) + 1;
+  let current = 0;
+  for(let i = 1; i < contentsHeadings.length; i++){
+    const rect = contentsHeadings[i].getBoundingClientRect();
+    const distance = vertical ? viewport.right - rect.right : rect.top - viewport.top;
+    if(distance > inset) break;
+    current = i;
+  }
+  return current;
+}
+function openContents(){
+  contentsPanel.showModal();
+  if(!contentsHeadings.length) return;
+  const list = $("contentsList");
+  list.querySelector("[aria-current]")?.removeAttribute("aria-current");
+  const entry = list.children[currentHeadingIndex()];
+  entry.setAttribute("aria-current","location");
+  list.scrollTop = entry.offsetTop - (list.clientHeight - entry.offsetHeight)/2;
+}
 $("contentsBtn").onclick = openContents;
 $("closeContents").onclick = () => contentsPanel.close();
 contentsPanel.addEventListener("click",event => {

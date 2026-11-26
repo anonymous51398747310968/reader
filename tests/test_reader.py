@@ -165,3 +165,35 @@ class ReaderTest(unittest.TestCase):
         expect(entries).to_have_count(0)
         self.swipe(180, 250, -120)
         expect(panel).to_be_hidden()
+
+    def test_contents_scrolls_to_the_section_being_read(self):
+        page = self.page
+        paragraph = "物語が続く。" * 90
+        # Identical titles ensure the drawer uses document position to select the entry.
+        text = ("## 同じ見出し\n\n" + paragraph + "\n\n" + paragraph + "\n\n") * 48
+        with page.expect_file_chooser() as chooser:
+            page.locator("#addBtn").tap()
+        chooser.value.set_files(
+            {"name": "長い目次.md", "mimeType": "text/markdown", "buffer": text.encode()}
+        )
+        page.get_by_role("button", name="長い目次 0%").tap()
+        panel = page.locator("#contentsList")
+        reader = page.locator("#readerScroll")
+        for direction in ("横書き", "縦書き"):
+            page.locator("#setBtn").tap()
+            page.get_by_role("button", name=direction, exact=True).tap()
+            page.locator("#sheetBack").tap(position={"x": 5, "y": 5})
+            for chapter in (33, 10):
+                page.locator("#readerContent p").nth(2 * chapter + 1).evaluate(
+                    "p => p.scrollIntoView({block:'start'})"
+                )
+                position = reader.evaluate("r => [r.scrollLeft, r.scrollTop]")
+                if chapter == 33:
+                    self.swipe(16, 400, 120)
+                else:
+                    page.locator("#contentsBtn").tap()
+                entry = panel.get_by_role("button").nth(chapter)
+                expect(entry).to_be_in_viewport(ratio=1)
+                expect(entry).to_have_attribute("aria-current", "location")
+                self.assertEqual(reader.evaluate("r => [r.scrollLeft, r.scrollTop]"), position)
+                page.locator("#closeContents").tap()
